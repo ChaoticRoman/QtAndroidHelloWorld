@@ -108,7 +108,8 @@ During the development you would like to use the Run option in the Qt Creator to
 launch of manual run-time test on connected Android device. Android device needs to be in
 Developer mode with USB debugging and Install via USB settings turned on.
 
-I did not have good results with testing in x86 emulator.
+You can use also x86 emulator. For this simple application I have not found any issues
+(but I did for more complex applications).
 
 ## Signing and publishing
 
