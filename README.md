@@ -9,87 +9,127 @@ for minimal Ubuntu installation. You have been warned!
 
 #### Installing dependencies
 
-```
+```bash
 sudo apt install git qtcreator libclang-dev libstdc++6:i386 \
     libgcc1:i386 zlib1g:i386 libncurses5:i386 libsdl1.2debian:i386 \
     lib32z1 cmake ninja-build build-essential default-jre \
     openjdk-8-jdk-headless android-sdk android-sdk-platform-23 \
-    libc6-i386 python-is-python3
+    libc6-i386
 ```
-
-There was a configuration warning in the end of the installation on the VM
-but it did not caused any issues laer in the process.
 
 #### Prepare directory for Android toolkit and libraries
 
 Keep your Android development stuff in a convenient location (modify
-following steps if you would choose different one).
+following steps if you would choose different one). Create this
+as a normal user.
 
+```bash
+topLevelAndroidDirectory=`realpath ~/.android`
+mkdir $topLevelAndroidDirectory
+cd $topLevelAndroidDirectory
 ```
-mkdir ~/.android
-cd ~/.android
+
+#### Configure environment
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+export PATH=$PATH:$JAVA_HOME/bin
 ```
 
 #### Android SDK and NDK
 
-**Important Note**: Tested with NDK revision r21d instead of r19c. Change the script
-referred in the instructions linked below accordingly.
+```bash
+ndkVersion="r21d"
+sdkBuildToolsVersion="28.0.3"
+sdkApiLevelInt=29
+sdkApiLevel=android-$sdkApiLevelInt
 
-Follow [Installing the Android SDK and NDK][SDK NDK], the "Scripted installation
+repository=https://dl.google.com/android/repository
+toolsFile=sdk-tools-linux-4333796.zip
+toolsFolder=android-sdk-tools
+ndkFile=android-ndk-$ndkVersion-linux-x86_64.zip
+ndkFolder=android-ndk-$ndkVersion
+
+wget $repository/$toolsFile
+unzip -q $toolsFile -d $toolsFolder
+
+wget $repository/$ndkFile
+unzip -q $ndkFile
+
+rm $toolsFile
+rm $ndkFile
+
+cd $toolsFolder/tools/bin
+
+echo "y" | ./sdkmanager "platforms;$sdkApiLevel" "platform-tools" "build-tools;$sdkBuildToolsVersion"
+```
+
+Inspired by [Installing the Android SDK and NDK][SDK NDK], the "Scripted installation
 on Linux section" (notice that bash script shall be run as a user).
 
 [SDK NDK]: https://wiki.qt.io/Android#Installing_the_Android_SDK_and_NDK
 
 #### OpenSSL for Qt for Android
 
-Follow [this tutorial](https://proandroiddev.com/tutorial-compile-openssl-to-1-1-1-for-android-application-87137968fee).
+```bash
+cd $topLevelAndroidDirectory
+opensslVersion="1.1.1h"
 
-**Notes:**
+wget https://www.openssl.org/source/openssl-$opensslVersion.tar.gz
+tar xf openssl-$opensslVersion.tar.gz
+rm openssl-$opensslVersion.tar.gz
 
-* Provided script uses Python 2, so replace `print toolchain_path`
-with `print(toolchain_path)` to be able to use it with Python 3.
-* Notice that there is Android NDK revision r20 used in the tutorial and
-OpenSSL 1.1.1c. Change it to r21d and current version of OpenSSL (1.1.1g at time
-of writing this).
+export ANDROID_NDK_HOME=$topLevelAndroidDirectory/android-ndk-$ndkVersion
+toolchains_path=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+CC=clang
+PATH=$toolchains_path/bin:$PATH
+
+cd openssl-$opensslVersion
+for architecture in android-arm android-arm64 android-x86 android-x86_64
+do
+    ./Configure ${architecture} -D__ANDROID_API__=$sdkApiLevelInt
+    make
+    OUTPUT_INCLUDE=$topLevelAndroidDirectory/openssl-$opensslVersion-build/include
+    OUTPUT_LIB=$topLevelAndroidDirectory/openssl-$opensslVersion-build/lib/${architecture}
+    mkdir -p $OUTPUT_INCLUDE
+    mkdir -p $OUTPUT_LIB
+    cp -RL include/openssl $OUTPUT_INCLUDE
+    cp libcrypto.so $OUTPUT_LIB
+    cp libcrypto.a $OUTPUT_LIB
+    cp libssl.so $OUTPUT_LIB
+    cp libssl.a $OUTPUT_LIB
+    make clean
+done
+cp -RL include/openssl $OUTPUT_INCLUDE
+cd $topLevelAndroidDirectory
+```
+
+Inspired by [this tutorial](https://proandroiddev.com/tutorial-compile-openssl-to-1-1-1-for-android-application-87137968fee).
 
 #### Qt for Android
 
-```
-cd ~/.android
-```
-[Build Qt for Android.](https://wiki.qt.io/Android#Building_Qt)
+```bash
+cd $topLevelAndroidDirectory
+git clone git://code.qt.io/qt/qt5.git qt5
+cd qt5
+perl init-repository
+git checkout v5.15.1
+git submodule update --init --recursive
 
-**Important Notes:**
+OPENSSL_LIBS="-L$topLevelAndroidDirectory/openssl-$opensslVersion-build/lib/ -lssl -lcrypto" \
+    ./configure \
+    -I$topLevelAndroidDirectory/openssl-$opensslVersion-build/include \
+    -xplatform android-clang --disable-rpath -nomake tests -nomake examples \
+    -skip qttranslations -skip qtserialport -no-warnings-are-errors \
+    -android-ndk $ANDROID_NDK_HOME \
+    -android-sdk $topLevelAndroidDirectory/$toolsFolder \
+    -android-ndk-host linux-x86_64 
 
-* You have suitable Qt Creator and all dependencies already installed.
-* Tested with **Qt v5.15.0**, beware of various
-  [version compatibility issues](https://doc.qt.io/qt-5/android-getting-started.html).
-* **There is missing `--init` in a submodules pull step! Use this comand below instead
-  of the one advised in the step 3 of instructions above.**
-
-        git submodule update --init --recursive
-
-  Directories `qtlocation` or `qtwebsockets` should not be empty after submodules pull step.
-
-* After setting JAVA_HOME and PATH variables in `~/.profile` configuration file, apply this
-  setting as well.
-
-```
-. ~/.profile
+make -j 12
+sudo make install
 ```
 
-* **You have to explicitely add OpenSSL support for Qt.** Step 5 should be for the case
-of directories used as advised like this:
-
-```
-OPENSSL_LIBS='-L/home/roman/.android/output/lib/ -lssl -lcrypto' \
-    ./configure -I/home/roman/.android/output/include -openssl \
-    -android-ndk-host linux-x86_64 -xplatform android-clang \
-    --disable-rpath -nomake tests -nomake examples \
-    -android-ndk ~/.android/android-ndk-r21d \
-    -android-sdk ~/.android/android-sdk-tools \
-    -no-warnings-are-errors -skip qttranslations -skip qtserialport
-```
+Inspired by [this page on Qt wiki](https://wiki.qt.io/Android#Building_Qt).
 
 #### Qt Creator configuration
 
