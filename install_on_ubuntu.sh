@@ -1,6 +1,9 @@
 # Dependencies
 
-sudo apt install git qtcreator libclang-dev libstdc++6:i386 \
+set -ex
+
+sudo apt update && sudo apt install -y \
+    git qtcreator libclang-dev libstdc++6:i386 \
     libgcc1:i386 zlib1g:i386 libncurses5:i386 libsdl1.2debian:i386 \
     lib32z1 cmake ninja-build build-essential default-jre \
     openjdk-8-jdk-headless android-sdk android-sdk-platform-23 \
@@ -14,6 +17,7 @@ export PATH=$PATH:$JAVA_HOME/bin
 # Prepare suitable directory              
 
 topLevelAndroidDirectory=`realpath ~/.android`
+rm -rf $topLevelAndroidDirectory
 mkdir $topLevelAndroidDirectory
 cd $topLevelAndroidDirectory
 
@@ -42,7 +46,12 @@ rm $ndkFile
 
 cd $toolsFolder/tools/bin
 
-echo "y" | ./sdkmanager "platforms;$sdkApiLevel" "platform-tools" "build-tools;$sdkBuildToolsVersion"
+echo "y" | ./sdkmanager "platform-tools" "build-tools;$sdkBuildToolsVersion"
+
+for level in $(eval echo "{21..$sdkApiLevel}")
+do
+    echo "y" | ./sdkmanager "platforms;android-$level" 
+done
 
 # OpenSSL for Android
 # Courtesy: https://proandroiddev.com/tutorial-compile-openssl-to-1-1-1-for-android-application-87137968fee
@@ -62,7 +71,7 @@ PATH=$toolchains_path/bin:$PATH
 cd openssl-$opensslVersion
 for architecture in android-arm android-arm64 android-x86 android-x86_64
 do
-    ./Configure ${architecture} -D__ANDROID_API__=$sdkApiLevelInt
+    ./Configure ${architecture} -D__ANDROID_API__=21 # 21 is the oldest API that Qt supports
     make
     OUTPUT_INCLUDE=$topLevelAndroidDirectory/openssl-$opensslVersion-build/include
     OUTPUT_LIB=$topLevelAndroidDirectory/openssl-$opensslVersion-build/lib/${architecture}
@@ -95,7 +104,7 @@ OPENSSL_LIBS="-L$topLevelAndroidDirectory/openssl-$opensslVersion-build/lib/ -ls
     -skip qttranslations -skip qtserialport -no-warnings-are-errors \
     -android-ndk $ANDROID_NDK_HOME \
     -android-sdk $topLevelAndroidDirectory/$toolsFolder \
-    -android-ndk-host linux-x86_64 
+    -android-ndk-host linux-x86_64 -opensource
 
 make -j 12
 sudo make install

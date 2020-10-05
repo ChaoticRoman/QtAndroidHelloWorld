@@ -135,7 +135,8 @@ Inspired by [this page on Qt wiki](https://wiki.qt.io/Android#Building_Qt).
 
 Follow with [Qt Creator configuration](https://wiki.qt.io/Android#Configuring_Qt_Creator)
 
-**Note:** Your Qt Android version is living in `/usr/local/Qt-5.15.0/`, its `qmake` is in `bin` subdirectory.
+**Note:** Your Qt Android version is living in `/usr/local/Qt-5.15.0/`, you enter its `qmake`
+location in `bin` subdirectory.
 
 # Building, installing and running the app on Android device
 
