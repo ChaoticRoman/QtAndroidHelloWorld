@@ -48,7 +48,7 @@ cd $toolsFolder/tools/bin
 
 echo "y" | ./sdkmanager "platform-tools" "build-tools;$sdkBuildToolsVersion"
 
-for level in $(eval echo "{21..$sdkApiLevel}")
+for level in $(eval echo "{21..$sdkApiLevelInt}")
 do
     echo "y" | ./sdkmanager "platforms;android-$level" 
 done
@@ -97,7 +97,8 @@ perl init-repository
 git checkout v5.15.1
 git submodule update --init --recursive
 
-OPENSSL_LIBS="-L$topLevelAndroidDirectory/openssl-$opensslVersion-build/lib/ -lssl -lcrypto" \
+echo y | \
+    OPENSSL_LIBS="-L$topLevelAndroidDirectory/openssl-$opensslVersion-build/lib/ -lssl -lcrypto" \
     ./configure \
     -I$topLevelAndroidDirectory/openssl-$opensslVersion-build/include \
     -xplatform android-clang --disable-rpath -nomake tests -nomake examples \
